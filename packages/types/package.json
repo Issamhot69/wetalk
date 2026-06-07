@@ -1,0 +1,12 @@
+{
+  "name": "@wetalk/types",
+  "version": "0.0.1",
+  "main": "./src/index.ts",
+  "scripts": {
+    "dev": "tsc --watch",
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

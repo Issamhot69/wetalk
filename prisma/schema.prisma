@@ -1,0 +1,250 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ═══════════════════════════════
+// USERS
+// ═══════════════════════════════
+model User {
+  id          String   @id @default(cuid())
+  username    String   @unique
+  email       String   @unique
+  phone       String?  @unique
+  password    String
+  avatar      String?
+  bio         String?
+  isOnline    Boolean  @default(false)
+  lastSeen    DateTime @default(now())
+  isVerified  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  messages        Message[]
+  channelMembers  ChannelMember[]
+  sentRequests    FriendRequest[] @relation("SentRequests")
+  receivedRequests FriendRequest[] @relation("ReceivedRequests")
+  emotions        EmotionLog[]
+  sessions        Session[]
+  notifications   Notification[]
+
+  @@map("users")
+}
+
+// ═══════════════════════════════
+// SESSIONS
+// ═══════════════════════════════
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  device    String?
+  ip        String?
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+// ═══════════════════════════════
+// CHANNELS (groupes, canaux, DMs)
+// ═══════════════════════════════
+model Channel {
+  id          String      @id @default(cuid())
+  name        String?
+  description String?
+  type        ChannelType @default(DIRECT)
+  avatar      String?
+  isPrivate   Boolean     @default(false)
+  isEncrypted Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  members  ChannelMember[]
+  messages Message[]
+
+  @@map("channels")
+}
+
+enum ChannelType {
+  DIRECT
+  GROUP
+  CHANNEL
+  WORKSPACE
+}
+
+model ChannelMember {
+  id        String      @id @default(cuid())
+  userId    String
+  channelId String
+  role      MemberRole  @default(MEMBER)
+  joinedAt  DateTime    @default(now())
+  lastRead  DateTime    @default(now())
+  isMuted   Boolean     @default(false)
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  channel Channel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, channelId])
+  @@map("channel_members")
+}
+
+enum MemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+// ═══════════════════════════════
+// MESSAGES
+// ═══════════════════════════════
+model Message {
+  id          String      @id @default(cuid())
+  content     String?
+  type        MessageType @default(TEXT)
+  isEncrypted Boolean     @default(true)
+  isEdited    Boolean     @default(false)
+  isDeleted   Boolean     @default(false)
+  replyToId   String?
+  channelId   String
+  senderId    String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  sender    User       @relation(fields: [senderId], references: [id])
+  channel   Channel    @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  replyTo   Message?   @relation("Replies", fields: [replyToId], references: [id])
+  replies   Message[]  @relation("Replies")
+  media     Media[]
+  reactions Reaction[]
+  emotion   EmotionLog?
+
+  @@map("messages")
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  FILE
+  VOICE
+  STICKER
+  SYSTEM
+}
+
+// ═══════════════════════════════
+// MEDIA
+// ═══════════════════════════════
+model Media {
+  id        String    @id @default(cuid())
+  url       String
+  type      MediaType
+  size      Int
+  name      String?
+  messageId String
+  createdAt DateTime  @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@map("media")
+}
+
+enum MediaType {
+  IMAGE
+  VIDEO
+  AUDIO
+  FILE
+}
+
+// ═══════════════════════════════
+// REACTIONS
+// ═══════════════════════════════
+model Reaction {
+  id        String   @id @default(cuid())
+  emoji     String
+  userId    String
+  messageId String
+  createdAt DateTime @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, messageId, emoji])
+  @@map("reactions")
+}
+
+// ═══════════════════════════════
+// AMIS
+// ═══════════════════════════════
+model FriendRequest {
+  id         String        @id @default(cuid())
+  senderId   String
+  receiverId String
+  status     RequestStatus @default(PENDING)
+  createdAt  DateTime      @default(now())
+
+  sender   User @relation("SentRequests", fields: [senderId], references: [id])
+  receiver User @relation("ReceivedRequests", fields: [receiverId], references: [id])
+
+  @@unique([senderId, receiverId])
+  @@map("friend_requests")
+}
+
+enum RequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  BLOCKED
+}
+
+// ═══════════════════════════════
+// IA ÉMOTIONNELLE
+// ═══════════════════════════════
+model EmotionLog {
+  id        String   @id @default(cuid())
+  userId    String
+  messageId String?  @unique
+  emotion   String
+  score     Float
+  valence   Float
+  arousal   Float
+  createdAt DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id])
+  message Message? @relation(fields: [messageId], references: [id])
+
+  @@map("emotion_logs")
+}
+
+// ═══════════════════════════════
+// NOTIFICATIONS
+// ═══════════════════════════════
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  body      String?
+  data      Json?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+enum NotificationType {
+  MESSAGE
+  FRIEND_REQUEST
+  MENTION
+  REACTION
+  SYSTEM
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@wetalk/ui",
+  "version": "0.0.1",
+  "main": "./src/components/index.ts",
+  "scripts": {
+    "dev": "tsc --watch",
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/react": "^18.3.0"
+  },
+  "peerDependencies": {
+    "react": "^18.3.0"
+  }
+}
